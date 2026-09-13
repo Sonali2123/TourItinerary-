@@ -1,5 +1,7 @@
 import { Itinerary } from '../store/useTripStore';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 export interface GenerateTripParams {
   destination: string;
   durationDays: number;
@@ -7,22 +9,51 @@ export interface GenerateTripParams {
   travelStyle: string;
 }
 
-export async function fetchGeneratedItinerary(params: GenerateTripParams): Promise<Itinerary> {
-  // Try connecting to NestJS backend if available, fallback to mock engine
+export interface BackendHealth {
+  status: string;
+  service: string;
+  timestamp: string;
+}
+
+/**
+ * Check health status of NestJS backend service
+ */
+export async function checkBackendHealth(): Promise<BackendHealth | null> {
   try {
-    const res = await fetch('http://localhost:4000/itinerary/generate', {
-      method: 'POST',
+    const res = await fetch(`${API_BASE_URL}/health`, {
+      method: 'GET',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
+      cache: 'no-store',
     });
     if (res.ok) {
       return await res.json();
     }
   } catch (err) {
-    console.warn('Backend server offline, generating fallback client itinerary.');
+    // API backend offline
+  }
+  return null;
+}
+
+/**
+ * Call NestJS POST /itinerary/generate API endpoint
+ */
+export async function fetchGeneratedItinerary(params: GenerateTripParams): Promise<Itinerary> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/itinerary/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      console.log('✅ Received itinerary from NestJS API Backend:', data);
+      return data;
+    }
+  } catch (err) {
+    console.warn('⚠️ NestJS API Server offline. Using dynamic client fallback engine.');
   }
 
-  // Fallback dynamic generator matching prompt specs
+  // Fallback client generator engine if server is offline
   const { destination, durationDays, budgetAmount, travelStyle } = params;
   const dailyBudget = Math.round(budgetAmount / durationDays);
 
