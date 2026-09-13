@@ -1,0 +1,113 @@
+// Prisma Schema for Tour Itinerary System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  GUIDE
+}
+
+enum TravelStyle {
+  ADVENTURE
+  RELAXATION
+  CULTURAL
+  BUDGET
+  LUXURY
+  FAMILY
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  name         String?
+  avatarUrl    String?
+  role         Role        @default(USER)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  itineraries  Itinerary[]
+  bookings     Booking[]
+}
+
+model Itinerary {
+  id           String      @id @default(uuid())
+  title        String
+  destination  String
+  durationDays Int
+  budgetAmount Float
+  currency     String      @default("INR")
+  style        TravelStyle @default(ADVENTURE)
+  summary      String?     @db.Text
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  userId       String?
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  dayPlans     DayPlan[]
+  bookings     Booking[]
+}
+
+model DayPlan {
+  id           String     @id @default(uuid())
+  dayNumber    Int
+  title        String
+  overview     String?    @db.Text
+  itineraryId  String
+  itinerary    Itinerary  @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  activities   Activity[]
+}
+
+model Activity {
+  id          String   @id @default(uuid())
+  timeSlot    String   // e.g. "09:00 AM"
+  title       String
+  description String   @db.Text
+  location    String?
+  estimatedCost Float? @default(0)
+  dayPlanId   String
+  dayPlan     DayPlan  @relation(fields: [dayPlanId], references: [id], onDelete: Cascade)
+}
+
+model Booking {
+  id          String        @id @default(uuid())
+  status      BookingStatus @default(PENDING)
+  totalPrice  Float
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itineraryId String
+  itinerary   Itinerary     @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  payment     Payment?
+  createdAt   DateTime      @default(now())
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  transactionId String        @unique
+  provider      String        // e.g., "RAZORPAY" or "STRIPE"
+  amount        Float
+  currency      String        @default("INR")
+  status        PaymentStatus @default(PENDING)
+  bookingId     String        @unique
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+}
